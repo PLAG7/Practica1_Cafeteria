@@ -1,12 +1,14 @@
-package cafeteria;
+package cafeteria.modelo;
 
 import java.util.ArrayList;
 
 public class GestorProductos {
     private ArrayList<Producto> productos;
+    private GestorArchivos archivos;
 
-    public GestorProductos(ArrayList<Producto> cargados) {
-        this.productos = cargados != null ? cargados : new ArrayList<>();
+    public GestorProductos(GestorArchivos archivos) {
+        this.archivos = archivos;
+        this.productos = archivos.cargarProductos();
     }
 
     public boolean registrar(Producto producto) {
@@ -14,6 +16,18 @@ public class GestorProductos {
             return false;
         }
         productos.add(producto);
+        archivos.guardarProductos(productos);
+        return true;
+    }
+
+    public boolean editar(String codigo, String nuevoNombre, double nuevoPrecio) {
+        Producto p = buscarPorCodigo(codigo);
+        if (p == null || nuevoPrecio <= 0 || nuevoNombre == null || nuevoNombre.trim().isEmpty()) {
+            return false;
+        }
+        p.setNombre(nuevoNombre.trim());
+        p.setPrecio(nuevoPrecio);
+        archivos.guardarProductos(productos);
         return true;
     }
 
@@ -26,21 +40,11 @@ public class GestorProductos {
         return null;
     }
 
-    public void listar() {
-        if (productos.isEmpty()) {
-            System.out.println("No hay productos registrados.");
-            return;
-        }
-        System.out.println("\n--- CATALOGO DE PRODUCTOS ---");
-        for (Producto p : productos) {
-            System.out.printf("Codigo: %s | %s | $%.2f | Stock: %d\n", p.getCodigo(), p.getNombre(), p.getPrecio(), p.getStock());
-        }
-    }
-
     public boolean reponerStock(String codigo, int cantidad) {
         Producto p = buscarPorCodigo(codigo);
         if (p != null && cantidad > 0) {
             p.aumentarStock(cantidad);
+            archivos.guardarProductos(productos);
             return true;
         }
         return false;
@@ -48,17 +52,22 @@ public class GestorProductos {
 
     public boolean hayStock(String codigo, int cantidad) {
         Producto p = buscarPorCodigo(codigo);
-        return p != null && p.getStock() >= cantidad;
+        return p != null && p.hayStock(cantidad);
     }
 
     public void descontarStock(String codigo, int cantidad) {
         Producto p = buscarPorCodigo(codigo);
         if (p != null) {
             p.reducirStock(cantidad);
+            archivos.guardarProductos(productos);
         }
     }
 
     public ArrayList<Producto> getProductos() {
         return productos;
+    }
+
+    public void guardarCambios() {
+        archivos.guardarProductos(productos);
     }
 }

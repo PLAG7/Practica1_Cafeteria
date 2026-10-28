@@ -1,4 +1,4 @@
-package cafeteria;
+package cafeteria.modelo;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -6,9 +6,13 @@ import java.util.ArrayList;
 public class GestorPedidos {
     private ArrayList<Pedido> pedidos;
     private int siguienteId;
+    private GestorProductos gestorProductos;
+    private GestorArchivos archivos;
 
-    public GestorPedidos(ArrayList<Pedido> cargados) {
-        this.pedidos = cargados != null ? cargados : new ArrayList<>();
+    public GestorPedidos(GestorProductos gestorProductos, GestorArchivos archivos) {
+        this.gestorProductos = gestorProductos;
+        this.archivos = archivos;
+        this.pedidos = archivos.cargarPedidos(gestorProductos.getProductos());
         this.siguienteId = 1;
         for (Pedido p : pedidos) {
             if (p.getId() >= siguienteId) {
@@ -18,75 +22,97 @@ public class GestorPedidos {
     }
 
     public Pedido crearPedido(String cliente) {
-        return new Pedido(siguienteId++, cliente, LocalDate.now());
+        return new Pedido(siguienteId, cliente, LocalDate.now());
     }
 
-    public void confirmarPedido(Pedido pedido) {
-        if (!pedido.getDetalles().isEmpty()) {
-            pedidos.add(pedido);
+    public boolean confirmarPedido(Pedido pedido) {
+        if (pedido == null || pedido.getDetalles().isEmpty()) {
+            return false;
         }
-    }
-
-    public void listar() {
-        System.out.println("\n--- LISTA DE PEDIDOS ---");
-        for (Pedido p : pedidos) {
-            System.out.printf("Pedido #%d | Cliente: %s | Total: $%.2f\n", p.getId(), p.getCliente(), p.calcularTotal());
-        }
-    }
-
-    public void generarReporteVentas(LocalDate fecha) {
-        int numPedidos = 0;
-        double totalVendido = 0;
-
-        for (Pedido p : pedidos) {
-            if (p.getFecha().equals(fecha)) {
-                numPedidos++;
-                totalVendido += p.calcularTotal();
+        for (DetallePedido dp : pedido.getDetalles()) {
+            if (!gestorProductos.hayStock(dp.getProducto().getCodigo(), dp.getCantidad())) {
+                return false;
             }
         }
-
-        System.out.println("\n--- REPORTE DE VENTAS (" + fecha + ") ---");
-        System.out.println("Numero de pedidos: " + numPedidos);
-        System.out.printf("Total vendido: $%.2f\n", totalVendido);
-
-        String mejorProd = productoMasVendido(fecha);
-        System.out.println("Producto de mayor demanda: " + (mejorProd.isEmpty() ? "Ninguno" : mejorProd));
+        for (DetallePedido dp : pedido.getDetalles()) {
+            gestorProductos.descontarStock(dp.getProducto().getCodigo(), dp.getCantidad());
+        }
+        pedido.setId(siguienteId++);
+        pedidos.add(pedido);
+        archivos.guardarProductos(gestorProductos.getProductos());
+        archivos.guardarPedidos(pedidos);
+        return true;
     }
 
-    public String productoMasVendido(LocalDate fecha) {
-        ArrayList<String> codigos = new ArrayList<>();
-        ArrayList<Integer> cantidades = new ArrayList<>();
-
+    public ArrayList<Pedido> ventasDelDia(LocalDate fecha) {
+        ArrayList<Pedido> delDia = new ArrayList<>();
         for (Pedido p : pedidos) {
             if (p.getFecha().equals(fecha)) {
-                for (DetallePedido dp : p.getDetalles()) {
-                    String cod = dp.getProducto().getCodigo();
-                    int idx = codigos.indexOf(cod);
-                    if (idx == -1) {
-                        codigos.add(cod);
-                        cantidades.add(dp.getCantidad());
-                    } else {
-                        cantidades.set(idx, cantidades.get(idx) + dp.getCantidad());
-                    }
+                delDia.add(p);
+            }
+        }
+        return delDia;
+    }
+
+    public ReporteVentas generarReporte(LocalDate fecha) {
+        ArrayList<Pedido> delDia = ventasDelDia(fecha);
+        int numPedidos = delDia.size();
+        double subtotal = 0;
+        double iva = 0;
+        double total = 0;
+
+        ArrayList<String> nombresProd = new ArrayList<>();
+        ArrayList<Integer> cantidadesProd = new ArrayList<>();
+
+        for (Pedido p : delDia) {
+            subtotal += p.calcularSubtotal();
+            iva += p.calcularIva();
+            total += p.calcularTotal();
+
+            for (DetallePedido dp : p.getDetalles()) {
+                String nombre = dp.getProducto().getNombre();
+                int idx = nombresProd.indexOf(nombre);
+                if (idx == -1) {
+                    nombresProd.add(nombre);
+                    cantidadesProd.add(dp.getCantidad());
+                } else {
+                    cantidadesProd.set(idx, cantidadesProd.get(idx) + dp.getCantidad());
                 }
             }
         }
 
-        if (codigos.isEmpty()) return "";
-
-        int maxCant = -1;
-        String codMax = "";
-        for (int i = 0; i < codigos.size(); i++) {
-            if (cantidades.get(i) > maxCant) {
-                maxCant = cantidades.get(i);
-                codMax = codigos.get(i);
+        int maxUnidades = 0;
+        for (int cant : cantidadesProd) {
+            if (cant > maxUnidades) {
+                maxUnidades = cant;
             }
         }
 
-        return codMax + " (" + maxCant + " unidades)";
+        ArrayList<String> unidadesPorProducto = new ArrayList<>();
+        ArrayList<String> mayorDemanda = new ArrayList<>();
+
+        for (int i = 0; i < nombresProd.size(); i++) {
+            String nom = nombresProd.get(i);
+            int cant = cantidadesProd.get(i);
+            boolean esMayor = (cant == maxUnidades && maxUnidades > 0);
+            unidadesPorProducto.add(nom + ";" + cant + ";" + (esMayor ? "Si" : "No"));
+            if (esMayor) {
+                mayorDemanda.add(nom);
+            }
+        }
+
+        return new ReporteVentas(fecha, numPedidos, subtotal, iva, total, unidadesPorProducto, mayorDemanda);
+    }
+
+    public ArrayList<String> productosMayorDemanda(LocalDate fecha) {
+        return generarReporte(fecha).getProductosMayorDemanda();
     }
 
     public ArrayList<Pedido> getPedidos() {
         return pedidos;
+    }
+
+    public void guardarCambios() {
+        archivos.guardarPedidos(pedidos);
     }
 }

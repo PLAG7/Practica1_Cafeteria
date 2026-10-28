@@ -1,4 +1,6 @@
-package cafeteria;
+package cafeteria.modelo;
+
+import java.util.Locale;
 
 public class Producto {
     private String codigo;
@@ -21,8 +23,16 @@ public class Producto {
         this.stock -= cantidad;
     }
 
+    public boolean hayStock(int cantidad) {
+        return this.stock >= cantidad;
+    }
+
+    public boolean estaAgotado() {
+        return this.stock <= 0;
+    }
+
     public String toLinea() {
-        return codigo + ";" + nombre + ";" + precio + ";" + stock;
+        return codigo + ";" + nombre + ";" + String.format(Locale.US, "%.2f", precio) + ";" + stock;
     }
 
     public String getCodigo() { 
@@ -48,5 +58,10 @@ public class Producto {
     }
     public void setStock(int stock) { 
     	this.stock = stock; 
+    }
+
+    @Override
+    public String toString() {
+        return codigo + " - " + nombre + " ($" + String.format(Locale.US, "%.2f", precio) + ")";
     }
 }

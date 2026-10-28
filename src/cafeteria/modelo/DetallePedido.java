@@ -1,4 +1,4 @@
-package cafeteria;
+package cafeteria.modelo;
 
 public class DetallePedido {
     private Producto producto;
@@ -21,7 +21,7 @@ public class DetallePedido {
     public void setProducto(Producto producto) { 
     	this.producto = producto; 
     }
-    public int getCantidad() { 
+    public int getCantidad() {
     	return cantidad; 
     }
     public void setCantidad(int cantidad) { 
@@ -31,6 +31,6 @@ public class DetallePedido {
     	return precioUnitario; 
     }
     public void setPrecioUnitario(double precioUnitario) { 
-    	this.precioUnitario = precioUnitario; 
+    	this.precioUnitario = precioUnitario;
     }
 }
